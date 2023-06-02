@@ -1,0 +1,133 @@
+Set Up Laravel
+    > composer create-project laravel/larevel "ProjectName"
+    > php artisan serve
+
+MySQL Setup
+    > .env
+    > DB_CONNECTION=mysql
+    > DB_DATABASE=supermarket
+    > DB_USERNAME=root
+    > DB_PASSWORD=myadmin123
+
+Basic Routing
+    > routes->api.php
+    > Route::get('/products', function() {return 'products} );
+
+Product Model & Migration
+    > php artisan make:model Product --migration
+    > databe->migration->2023_06_02_051004_create_products_table.php
+    >
+
+Using the Model
+    > use App\Models\Product;
+    > Product::all();
+    > return Product::create([FieldName => Value]);
+    > use App\Models\Product:  protected $fillable = [FieldName_to_Allow_Fillout];
+
+Product Controller & Methods
+    > php artisan make:controller ProductController --api
+    > public function index() return Product::all();
+    > move use App\Models\Product from route to controller
+    > Route::get('/products', [ProductController::class, 'index']);
+
+Create Product & Validation
+    > Route::post('/products', [ProductController::class, 'store']);
+    > public function store(Request $request)  return Product::create($request->all());
+    > In POSTMAN: Headers->Accept = application/json
+    > To validate your input: $request->validate([FieldName => Rules]);
+
+Single Product & Resource routes
+    > Route::get('/products/{id}', [ProductController::class, 'show']);
+    > public function show(string $id)
+    > return Product::findOrFail($id);
+    > Resource routes: Route::resource('uriGeneralName ', ProductController::class);
+    > php artisan route:list
+
+Update Product
+    > $product = Product::find($id);
+    > $product->update($request->all());
+    > return $product;
+
+Delete Product
+    > return Product::destroy($id);
+
+Search Product
+    > return Product::where('name', 'like' ,'%' . $name . '%')->get();
+    > Route::get('/products/search/{name}', [ProductController::class, 'search']);
+
+Sanctum Setup - Laravel Sanctum provides a featherweight authentication system for SPAs 
+                (single page applications), mobile applications, and simple, token based APIs. Sanctum allows each user of your application 
+                to generate multiple API tokens for their account. 
+    
+    > composer require laravel/sanctum
+    > php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
+    > database->migration->2019_12_14_000001_create_personal_access_tokens_table.php
+    > php artisan migrate
+    > app->Http->Kernel.php
+    > Replace this 
+    " 
+        'api' => [
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ],
+    "
+    > In User.php (Model)
+    "
+        use Laravel\Sanctum\HasApiTokens;
+        
+        class User extends Authenticatable
+        {
+            use HasApiTokens, HasFactory, Notifiable;
+        }
+    "
+
+Protecting Routes
+    > api.php
+    > Route::group(['middleware' => ['auth:sanctum']], function())
+    > Route::get('/products/search/{name}', [ProductController::class, 'search']);
+    > Accept => application/json
+
+Auth Controller
+    > php artisan make:controller AuthController
+
+Register User & Get Token
+    > use App\Models\User;
+    > use Illuminate\Http\Response;
+    > public function register(Request $request)
+    > $fields = $request->validate([
+            'name' => ['required', 'min:3'],
+            'email' => ['required', 'email', Rule::unique('users', 'email')],
+            'password' => 'required|confirmed|min:6'
+      ]);
+    >  $fields['password'] = bcrypt($fields['password']);
+    >  $user = User::create($fields);
+    >  $token = $user->createToken('myapptoken')->plainTextToken;
+    >  $response = [
+            'user' => $user,
+            'token' => $token
+        ];
+    > return response($response, 201);
+    > Route::post('/register', [AuthController::class, 'register']);
+    > "token": "1|6LLKcBv4g2Fu7VrNRFNe6UiCDYe0PvduXX5v5pCT": this token was use to able access protected routes
+    > In postman: Authrization->bearer token
+
+Logout & Delete Token
+    > public function logout(Request $request)
+    > auth()->user()->tokens()->delete(); 
+    > Route::post('/logout', [AuthController::class, 'logout']);
+
+Login & Get Token
+    > $fields = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => 'required|confirmed|min:6'
+      ]);
+    > $user = User::where('email', $fields['email'])->first(); = Check email
+    > if(!user || !Hash::check($fields['password'], $user->password)){
+            return response([
+                'message' => 'Bad Credentials'
+            ], 401);
+      } // Check Password
+      
+    > Route::post('/login', [AuthController::class, 'login']);
+
